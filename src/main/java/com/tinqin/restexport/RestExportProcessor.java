@@ -105,8 +105,19 @@ public class RestExportProcessor {
         Class<?> parameterType;
         try {
             String[] tokens = element.asType().toString().split("\\s+");
+            //TODO add support  for generics
+            // ((Symbol.VarSymbol) element).asMethodHandle(true).asType().getTypeArguments() => generic type
+            // if (element.asType().toString()).contains('<'){
+            //      tokens[] = split('<')
+            //      tokens[0] => containing class type
 
-            parameterType = Class.forName(tokens[tokens.length - 1]);
+            //TODO REFACTOR IF-ELSE
+            String typeName = ((ExecutableElement) element).asType().toString();
+            if (typeName.contains("<")) {
+                parameterType = Class.forName(typeName.split("<")[0]);
+            } else {
+                parameterType = Class.forName(tokens[tokens.length - 1]);
+            }
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -116,7 +127,8 @@ public class RestExportProcessor {
                         element.getAnnotation(RequestParam.class))
                 .filter(Objects::nonNull)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Unannotated parameter in controller signature."));
+//                .orElseThrow(() -> new RuntimeException("Unannotated parameter in controller signature."));
+                .orElseThrow(() -> new RuntimeException(String.format("%s: Unannotated parameter in controller signature for method '%s'", parameterType, element.asType().toString())));
 
         return MirrorParameter.builder()
                 .name(element.getSimpleName().toString())
