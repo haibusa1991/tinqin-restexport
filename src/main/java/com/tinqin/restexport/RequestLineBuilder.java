@@ -23,6 +23,10 @@ public class RequestLineBuilder {
             sb.append(this.mappingData.getRequestMapping().path()[0]);
         }
 
+        if (sb.charAt(sb.length() - 1) == ' ' || sb.charAt(sb.indexOf(" ") + 1) != '/') {
+            sb.append("/");
+        }
+
         List<MirrorParameter> requestParams = mappingData.getMirrorParameters()
                 .stream()
                 .filter(e -> e.getAnnotation().annotationType().equals(RequestParam.class))

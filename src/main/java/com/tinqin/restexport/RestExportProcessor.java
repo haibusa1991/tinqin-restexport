@@ -29,11 +29,13 @@ public class RestExportProcessor {
     private final RoundEnvironment roundEnv;
     private final String targetPath;
     private final String targetPackage;
+    private final String fileName;
 
-    public RestExportProcessor(RoundEnvironment roundEnv, String targetPath, String targetPackage) {
+    public RestExportProcessor(RoundEnvironment roundEnv, String targetPath, String targetPackage, String fileName) {
         this.roundEnv = roundEnv;
         this.targetPath = targetPath;
         this.targetPackage = targetPackage;
+        this.fileName = fileName;
     }
 
     public boolean processAnnotation() {
@@ -48,7 +50,7 @@ public class RestExportProcessor {
                 .filter(Objects::nonNull)
                 .toList();
 
-        RestExportGenerator generator = new RestExportGenerator(requestMappingData, this.targetPath, this.targetPackage);
+        RestExportGenerator generator = new RestExportGenerator(requestMappingData, this.targetPath, this.targetPackage, this.fileName);
 
         try {
             generator.generate();
@@ -102,37 +104,39 @@ public class RestExportProcessor {
 
     public MirrorParameter getMirrorParameter(VariableElement element) {
 
-        Class<?> parameterType;
+        Class<?> parameterType = Object.class;
+        Class<?> genericType = Object.class;
         try {
             String[] tokens = element.asType().toString().split("\\s+");
-            //TODO add support  for generics
-            // ((Symbol.VarSymbol) element).asMethodHandle(true).asType().getTypeArguments() => generic type
-            // if (element.asType().toString()).contains('<'){
-            //      tokens[] = split('<')
-            //      tokens[0] => containing class type
+            String parameterTypeRaw = tokens[tokens.length - 1];
 
-            //TODO REFACTOR IF-ELSE
-            String typeName = ((ExecutableElement) element).asType().toString();
-            if (typeName.contains("<")) {
-                parameterType = Class.forName(typeName.split("<")[0]);
-            } else {
+            if (parameterTypeRaw.contains("<")) {
+                genericType = Class.forName(parameterTypeRaw.substring(parameterTypeRaw.indexOf('<') + 1, parameterTypeRaw.indexOf('>')));
+                parameterType = Class.forName(tokens[tokens.length - 1].split("<")[0]);
+            }
+
+            if (!parameterTypeRaw.contains("<")) {
                 parameterType = Class.forName(tokens[tokens.length - 1]);
             }
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
 
+        Class<?> finalParameterType = parameterType;
         Annotation annotation = Stream.of(element.getAnnotation(RequestBody.class),
                         element.getAnnotation(PathVariable.class),
                         element.getAnnotation(RequestParam.class))
                 .filter(Objects::nonNull)
                 .findFirst()
 //                .orElseThrow(() -> new RuntimeException("Unannotated parameter in controller signature."));
-                .orElseThrow(() -> new RuntimeException(String.format("%s: Unannotated parameter in controller signature for method '%s'", parameterType, element.asType().toString())));
+                .orElseThrow(() -> new RuntimeException(String.format("%s: Unannotated parameter in controller signature for method '%s'",
+                        finalParameterType,
+                        element.asType().toString())));
 
         return MirrorParameter.builder()
                 .name(element.getSimpleName().toString())
                 .parameterType(parameterType)
+                .genericType(genericType)
                 .annotation(annotation)
                 .build();
     }

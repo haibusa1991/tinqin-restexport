@@ -11,16 +11,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public class RestExportGenerator {
     private final List<RequestMappingData> methodList;
     private final String targetPath;
     private final String targetPackage;
+    private final String fileName;
 
-    public RestExportGenerator(List<RequestMappingData> methodList, String targetPath, String targetPackage) {
+    public RestExportGenerator(List<RequestMappingData> methodList, String targetPath, String targetPackage, String fileName) {
         this.methodList = methodList;
         this.targetPath = targetPath;
         this.targetPackage = targetPackage;
+        this.fileName = fileName;
     }
 
     public void generate() throws IOException, JCodeModelException {
@@ -30,15 +33,13 @@ public class RestExportGenerator {
     private void process(List<RequestMappingData> restExportAnnotatedMethods) throws JCodeModelException, IOException {
         JCodeModel jcm = new JCodeModel();
 
-//        JDefinedClass clazz = jcm._class("com.tinqin.bff.rest.restexport.RestExport", EClassType.INTERFACE);
-        JDefinedClass clazz = jcm._class(this.targetPackage, EClassType.INTERFACE);
+        JDefinedClass clazz = jcm._class(this.targetPackage + "." + this.fileName, EClassType.INTERFACE);
         clazz.annotate(feign.Headers.class).paramArray("value", "Content-Type: application/json"); //hardcoded
 
         restExportAnnotatedMethods.forEach(e -> this.addMethod(clazz, e));
 
 
         JCMWriter writer = new JCMWriter(jcm);
-//        writer.build(new File("rest/src/main/java"));
         writer.build(new File(this.targetPath));
     }
 
@@ -72,6 +73,16 @@ public class RestExportGenerator {
                 ? mirrorParameter.getName()
                 : ((PathVariable) mirrorParameter.getAnnotation()).name();
 
+
+        if (!mirrorParameter.getGenericType().equals(Object.class)) {
+            AbstractJType parameterType = new JCodeModel().ref(mirrorParameter.getParameterType()).narrow(mirrorParameter.getGenericType());
+
+            method.param(parameterType, parameterName)
+                    .annotate(Param.class)
+                    .param("value", parameterName);
+            return;
+        }
+
         method.param(mirrorParameter.getParameterType(), parameterName)
                 .annotate(Param.class)
                 .param("value", parameterName);
@@ -83,6 +94,15 @@ public class RestExportGenerator {
                 ? mirrorParameter.getName()
                 : ((RequestParam) mirrorParameter.getAnnotation()).name();
 
+        if (!mirrorParameter.getGenericType().equals(Object.class)) {
+            AbstractJType parameterType = new JCodeModel().ref(mirrorParameter.getParameterType()).narrow(mirrorParameter.getGenericType());
+
+            method.param(parameterType, parameterName)
+                    .annotate(Param.class)
+                    .param("value", parameterName);
+            return;
+        }
+
         method.param(mirrorParameter.getParameterType(), mirrorParameter.getName())
                 .annotate(Param.class)
                 .param("value", parameterName);
@@ -93,6 +113,4 @@ public class RestExportGenerator {
         method.param(mirrorParameter.getParameterType(), mirrorParameter.getName())
                 .annotate(Param.class);
     }
-
-
 }

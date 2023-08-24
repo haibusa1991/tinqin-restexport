@@ -11,5 +11,6 @@ public class MirrorParameter {
 
     private String name;
     private Class<?> parameterType;
+    private Class<?> genericType;
     private Annotation annotation;
 }
