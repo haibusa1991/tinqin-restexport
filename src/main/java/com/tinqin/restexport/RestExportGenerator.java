@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 
 public class RestExportGenerator {
     private final List<RequestMappingData> methodList;
@@ -38,7 +37,6 @@ public class RestExportGenerator {
 
         restExportAnnotatedMethods.forEach(e -> this.addMethod(clazz, e));
 
-
         JCMWriter writer = new JCMWriter(jcm);
         writer.build(new File(this.targetPath));
     }
@@ -55,62 +53,53 @@ public class RestExportGenerator {
         mappingData.getMirrorParameters()
                 .stream()
                 .filter(e -> e.getAnnotation().annotationType().equals(PathVariable.class))
-                .forEach(e -> this.addPathVariableParameterToMethod(method, e));
+                .forEach(e -> this.addParameterToMethod(method, e, AnnotationType.PATH_VARIABLE));
 
         mappingData.getMirrorParameters()
                 .stream()
                 .filter(e -> e.getAnnotation().annotationType().equals(RequestParam.class))
-                .forEach(e -> this.addRequestParamParameterToMethod(method, e));
+                .forEach(e -> this.addParameterToMethod(method, e, AnnotationType.REQUEST_PARAM));
 
         mappingData.getMirrorParameters()
                 .stream()
                 .filter(e -> e.getAnnotation().annotationType().equals(RequestBody.class))
-                .forEach(e -> this.addRequestBodyParameterToMethod(method, e));
+                .forEach(e -> this.addParameterToMethod(method, e, AnnotationType.REQUEST_BODY));
     }
 
-    private void addPathVariableParameterToMethod(JMethod method, MirrorParameter mirrorParameter) {
-        String parameterName = ((PathVariable) mirrorParameter.getAnnotation()).name().isEmpty()
-                ? mirrorParameter.getName()
-                : ((PathVariable) mirrorParameter.getAnnotation()).name();
-
-
-        if (!mirrorParameter.getGenericType().equals(Object.class)) {
-            AbstractJType parameterType = new JCodeModel().ref(mirrorParameter.getParameterType()).narrow(mirrorParameter.getGenericType());
-
-            method.param(parameterType, parameterName)
-                    .annotate(Param.class)
-                    .param("value", parameterName);
+    private void addParameterToMethod(JMethod method, MirrorParameter mirrorParameter, AnnotationType annotationType) {
+        if (annotationType == AnnotationType.REQUEST_BODY) {
+            method.param(mirrorParameter.getParameterType(), mirrorParameter.getName()).annotate(Param.class);
             return;
         }
 
-        method.param(mirrorParameter.getParameterType(), parameterName)
-                .annotate(Param.class)
-                .param("value", parameterName);
-    }
+        JCodeModel owner = method.owner();
 
-
-    private void addRequestParamParameterToMethod(JMethod method, MirrorParameter mirrorParameter) {
-        String parameterName = ((RequestParam) mirrorParameter.getAnnotation()).name().isEmpty()
-                ? mirrorParameter.getName()
-                : ((RequestParam) mirrorParameter.getAnnotation()).name();
-
+        AbstractJClass parameterType = owner.ref(mirrorParameter.getParameterType().getSimpleName());
         if (!mirrorParameter.getGenericType().equals(Object.class)) {
-            AbstractJType parameterType = new JCodeModel().ref(mirrorParameter.getParameterType()).narrow(mirrorParameter.getGenericType());
-
-            method.param(parameterType, parameterName)
-                    .annotate(Param.class)
-                    .param("value", parameterName);
-            return;
+            parameterType = new JCodeModel()
+                    .ref(mirrorParameter.getParameterType())
+                    .narrow(owner.ref(mirrorParameter.getGenericType().getSimpleName()));
         }
 
-        method.param(mirrorParameter.getParameterType(), mirrorParameter.getName())
-                .annotate(Param.class)
-                .param("value", parameterName);
+        method.param(parameterType, mirrorParameter.getName())
+                .annotate(owner.ref(Param.class))
+                .param("value", getParameterName(mirrorParameter, annotationType));
     }
 
+    private String getParameterName(MirrorParameter mirrorParameter, AnnotationType annotationType) {
+        String parameterName = "";
+        if (annotationType == AnnotationType.PATH_VARIABLE) {
+            parameterName = ((PathVariable) mirrorParameter.getAnnotation()).name().isEmpty()
+                    ? mirrorParameter.getName()
+                    : ((PathVariable) mirrorParameter.getAnnotation()).name();
+        }
 
-    private void addRequestBodyParameterToMethod(JMethod method, MirrorParameter mirrorParameter) {
-        method.param(mirrorParameter.getParameterType(), mirrorParameter.getName())
-                .annotate(Param.class);
+        if (annotationType == AnnotationType.REQUEST_PARAM) {
+            parameterName = ((RequestParam) mirrorParameter.getAnnotation()).name().isEmpty()
+                    ? mirrorParameter.getName()
+                    : ((RequestParam) mirrorParameter.getAnnotation()).name();
+        }
+
+        return parameterName;
     }
 }
