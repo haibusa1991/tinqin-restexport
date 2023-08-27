@@ -68,7 +68,7 @@ public class RestExportGenerator {
 
     private void addParameterToMethod(JMethod method, MirrorParameter mirrorParameter, AnnotationType annotationType) {
         if (annotationType == AnnotationType.REQUEST_BODY) {
-            method.param(mirrorParameter.getParameterType(), mirrorParameter.getName()).annotate(Param.class);
+            method.param(mirrorParameter.getParameterType(), mirrorParameter.getName());
             return;
         }
 
